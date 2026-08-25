@@ -54,6 +54,8 @@ btn_released = True              # only count a press after seeing release (debo
 bootsel_press_time = 0
 reset_flash_until  = 0
 glitch_until       = 0     # glitch animation runs until this time
+glitch_sound_phase = 0     # which tone in the glitch sound sequence we're on
+glitch_sound_start = 0     # when current tone started
 in_glitch          = False
 tap_times          = []    # timestamps of recent START/STOP taps for triple-tap detection
 last_draw_ms = 0
@@ -67,7 +69,7 @@ prev_right = None                # (inverted, progress_bucket)
 # --- buzzer: context-aware beep tones ---
 def tone(freq_hz, ms, gap_ms=0):
     """Sound `freq_hz` for `ms`, then optionally stay silent for `gap_ms`."""
-    if not BUZZER_ENABLED or in_glitch:
+    if not BUZZER_ENABLED:
         return
     buzzer.freq(freq_hz)
     buzzer.duty_u16(BUZZER_DUTY)
@@ -91,14 +93,33 @@ def beep_reset():
     tone(2600, 60)
 
 def beep_glitch():
-    """Descending noise burst — glitch triggered."""
-    tone(3000, 150)
-    time.sleep_ms(80)
-    tone(2000, 150)
-    time.sleep_ms(80)
-    tone(1200, 150)
-    time.sleep_ms(80)
-    tone(600, 200)
+    """Start non-blocking glitch sound — advances during render loop."""
+    global glitch_sound_phase, glitch_sound_start
+    if not BUZZER_ENABLED:
+        return
+    # Sequence: (freq, duration_ms), gaps between tones
+    glitch_sound_phase = 0
+    glitch_sound_start = time.ticks_ms()
+
+def _glitch_sound_tick():
+    """Advance glitch sound one step. Call from render loop."""
+    global glitch_sound_phase, glitch_sound_start
+    now = time.ticks_ms()
+    seq = [(3000, 150), (2000, 150), (1200, 150), (600, 200)]
+    gaps = [80, 80, 80, 0]
+    if glitch_sound_phase >= len(seq):
+        buzzer.duty_u16(0)
+        return
+    freq, dur = seq[glitch_sound_phase]
+    if time.ticks_diff(now, glitch_sound_start) >= dur:
+        buzzer.duty_u16(0)
+        if gaps[glitch_sound_phase] > 0:
+            glitch_sound_phase += 1
+            glitch_sound_start = now
+        else:
+            glitch_sound_phase = len(seq)  # done
+    buzzer.freq(freq)
+    buzzer.duty_u16(BUZZER_DUTY)
 
 
 def format_time(us):
@@ -229,10 +250,10 @@ while True:
                 tap_times.pop(0)
             if len(tap_times) >= 3:
                 # triple-tap detected -> trigger glitch
-                beep_glitch()
-                glitch_until = time.ticks_add(now_ms, GLITCH_RUN_MS)
                 in_glitch = True
+                glitch_until = time.ticks_add(now_ms, GLITCH_RUN_MS)
                 tap_times.clear()
+                beep_glitch()  # start non-blocking sound
                 print("GLITCH (triple-tap)")
             else:
                 # normal start/stop toggle
@@ -267,6 +288,7 @@ while True:
         last_draw_ms = now_ms
         if time.ticks_diff(glitch_until, now_ms) > 0:      # glitch burst in progress
             in_glitch = True
+            _glitch_sound_tick()  # advance glitch sound during animation
             glitch_frame()
             oled.show()
         else:
