@@ -14,6 +14,8 @@ FRAME_MS = 1000 // TARGET_FPS
 RESET_FLASH_MS = 250        # how long the RESET tile stays lit after firing
 BUZZER_PIN = 15             # PWM pin for passive buzzer (Pin 20)
 BUZZER_ENABLED = True       # set False to mute buzzer
+BUZZER_DUTY = 32768         # 50% duty = loudest. 0 and 65535 are BOTH silent:
+                            # at 100% the pin never toggles, so there is no waveform.
 
 # --- layout (128x64) ---
 TIME_SCALE = 2              # 8x8 font scaled 2x -> 16x16 per char
@@ -36,8 +38,11 @@ oled = SSD1306_I2C(128, 64, i2c, addr=0x3C)
 # Button on GP16 to GND — start/stop toggle
 btn = Pin(16, Pin.IN, Pin.PULL_UP)
 
-# Passive buzzer on GP15 — transistor switch to GND
-buzzer_pin = Pin(BUZZER_PIN, Pin.OUT, value=0)
+# Passive buzzer on GP15 (PWM) — a passive buzzer has no oscillator of its own,
+# so it needs an audio-frequency square wave, not a DC level.
+buzzer = PWM(Pin(BUZZER_PIN))
+buzzer.freq(2000)
+buzzer.duty_u16(0)          # start silent
 
 # --- state ---
 running      = False
@@ -55,28 +60,30 @@ prev_right = None                # (inverted, progress_bucket)
 
 
 # --- buzzer: context-aware beep tones ---
-def buzz(on_ms, off_ms, cycles):
-    """Click buzzer on/off at ~1/(on+off) Hz for `cycles` repetitions."""
+def tone(freq_hz, ms, gap_ms=0):
+    """Sound `freq_hz` for `ms`, then optionally stay silent for `gap_ms`."""
     if not BUZZER_ENABLED:
         return
-    for _ in range(cycles):
-        buzzer_pin.value(1)
-        time.sleep_ms(on_ms)
-        buzzer_pin.value(0)
-        if off_ms > 0:
-            time.sleep_ms(off_ms)
+    buzzer.freq(freq_hz)
+    buzzer.duty_u16(BUZZER_DUTY)
+    time.sleep_ms(ms)
+    buzzer.duty_u16(0)          # duty 0 = silent; freq is left alone
+    if gap_ms > 0:
+        time.sleep_ms(gap_ms)
 
 def beep_start():
-    """Medium click — action confirmed."""
-    buzz(100, 50, 2)   # click-click
+    """Rising two-tone — timing has begun."""
+    tone(1800, 70, 30)
+    tone(2600, 90)
 
 def beep_stop():
-    """Short click — pause acknowledged."""
-    buzz(60, 0, 1)     # click
+    """Single lower tone — paused."""
+    tone(1200, 120)
 
 def beep_reset():
-    """Distinct double-click — different action."""
-    buzz(50, 80, 2)    # click-click (with pause between)
+    """Two short identical chirps — distinct from start/stop."""
+    tone(2600, 60, 70)
+    tone(2600, 60)
 
 
 def format_time(us):
