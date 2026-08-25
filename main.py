@@ -250,6 +250,7 @@ while True:
                 tap_times.pop(0)
             if len(tap_times) >= 3:
                 # triple-tap detected -> trigger glitch
+                running = False       # pause timer during/after glitch
                 in_glitch = True
                 glitch_until = time.ticks_add(now_ms, GLITCH_RUN_MS)
                 tap_times.clear()
