@@ -1,5 +1,5 @@
 # main.py — stopwatch, GME12864-11 / SSD1306 128x64
-from machine import Pin, I2C
+from machine import Pin, I2C, PWM
 from ssd1306 import SSD1306_I2C
 import framebuf
 import random
@@ -15,6 +15,10 @@ FRAME_MS = 1000 // TARGET_FPS
 RESET_FLASH_MS = 250        # how long the RESET tile stays lit after firing
 TRIPLE_TAP_WINDOW_MS = 500  # window to register triple-tap for glitch
 GLITCH_RUN_MS  = 1500       # how long the glitch animation runs once triggered
+BUZZER_PIN = 15             # PWM pin for passive buzzer (Pin 20)
+BUZZER_ENABLED = True       # set False to mute buzzer
+BUZZER_DUTY = 32768         # 50% duty = loudest. 0 and 65535 are BOTH silent:
+                            # at 100% the pin never toggles, so there is no waveform.
 
 # --- layout (128x64) ---
 TIME_SCALE = 2              # 8x8 font scaled 2x -> 16x16 per char
@@ -37,6 +41,12 @@ oled = SSD1306_I2C(128, 64, i2c, addr=0x3C)
 # Button on GP16 to GND — start/stop toggle
 btn = Pin(16, Pin.IN, Pin.PULL_UP)
 
+# Passive buzzer on GP15 (PWM) — a passive buzzer has no oscillator of its own,
+# so it needs an audio-frequency square wave, not a DC level.
+buzzer = PWM(Pin(BUZZER_PIN))
+buzzer.freq(2000)
+buzzer.duty_u16(0)          # start silent
+
 # --- state ---
 running      = False
 elapsed_us   = 0
@@ -53,6 +63,41 @@ last_draw_ms = 0
 prev_time_chars = [None] * 8
 prev_left  = None                # (label, inverted)
 prev_right = None                # (inverted, progress_bucket)
+
+
+# --- buzzer: context-aware beep tones ---
+def tone(freq_hz, ms, gap_ms=0):
+    """Sound `freq_hz` for `ms`, then optionally stay silent for `gap_ms`."""
+    if not BUZZER_ENABLED or in_glitch:
+        return
+    buzzer.freq(freq_hz)
+    buzzer.duty_u16(BUZZER_DUTY)
+    time.sleep_ms(ms)
+    buzzer.duty_u16(0)          # duty 0 = silent; freq is left alone
+    if gap_ms > 0:
+        time.sleep_ms(gap_ms)
+
+def beep_start():
+    """Rising two-tone — timing has begun."""
+    tone(1800, 70, 30)
+    tone(2600, 90)
+
+def beep_stop():
+    """Single lower tone — paused."""
+    tone(1200, 120)
+
+def beep_reset():
+    """Two short identical chirps — distinct from start/stop."""
+    tone(2600, 60, 70)
+    tone(2600, 60)
+
+def beep_glitch():
+    """Descending noise burst — glitch triggered."""
+    tone(3000, 40)
+    time.sleep_ms(20)
+    tone(1500, 40)
+    time.sleep_ms(20)
+    tone(800, 100)
 
 
 def format_time(us):
@@ -183,6 +228,7 @@ while True:
                 tap_times.pop(0)
             if len(tap_times) >= 3:
                 # triple-tap detected -> trigger glitch
+                beep_glitch()
                 glitch_until = time.ticks_add(now_ms, GLITCH_RUN_MS)
                 in_glitch = True
                 tap_times.clear()
@@ -190,6 +236,10 @@ while True:
             else:
                 # normal start/stop toggle
                 running = not running
+                if running:
+                    beep_start()
+                else:
+                    beep_stop()
                 print(f"{'START' if running else 'STOP'}: {format_time(elapsed_us)}")
         btn_released = not gp16_down
 
@@ -204,6 +254,7 @@ while True:
                 if not running:
                     elapsed_us = 0
                     reset_flash_until = time.ticks_add(now_ms, RESET_FLASH_MS)
+                    beep_reset()
                     print("RESET (BOOTSEL hold)")
                 bootsel_press_time = 0      # clear so the next press can trigger again
                 hold_ms = 0
