@@ -36,10 +36,8 @@ oled = SSD1306_I2C(128, 64, i2c, addr=0x3C)
 # Button on GP16 to GND — start/stop toggle
 btn = Pin(16, Pin.IN, Pin.PULL_UP)
 
-# Passive buzzer on GP15 (PWM) — transistor switch to GND
-buzzer = PWM(Pin(BUZZER_PIN))
-buzzer.freq(2000)
-buzzer.duty_u16(0)  # start silent
+# Passive buzzer on GP15 — transistor switch to GND
+buzzer_pin = Pin(BUZZER_PIN, Pin.OUT, value=0)
 
 # --- state ---
 running      = False
@@ -57,28 +55,28 @@ prev_right = None                # (inverted, progress_bucket)
 
 
 # --- buzzer: context-aware beep tones ---
-def beep(freq, duration_ms):
-    """Play a tone at `freq` Hz for `duration_ms`. Non-blocking if buzzer already on."""
+def buzz(on_ms, off_ms, cycles):
+    """Click buzzer on/off at ~1/(on+off) Hz for `cycles` repetitions."""
     if not BUZZER_ENABLED:
         return
-    buzzer.freq(freq)
-    buzzer.duty_u16(65535)  # 100% duty cycle for max current
-    time.sleep_ms(duration_ms)
-    buzzer.duty_u16(0)      # stop
+    for _ in range(cycles):
+        buzzer_pin.value(1)
+        time.sleep_ms(on_ms)
+        buzzer_pin.value(0)
+        if off_ms > 0:
+            time.sleep_ms(off_ms)
 
 def beep_start():
-    """Medium ascending beep — action confirmed."""
-    beep(2000, 150)
+    """Medium click — action confirmed."""
+    buzz(100, 50, 2)   # click-click
 
 def beep_stop():
-    """Short descending beep — pause acknowledged."""
-    beep(1500, 80)
+    """Short click — pause acknowledged."""
+    buzz(60, 0, 1)     # click
 
 def beep_reset():
-    """Distinct double-beep — different action."""
-    beep(1000, 80)
-    time.sleep_ms(50)
-    beep(1200, 80)
+    """Distinct double-click — different action."""
+    buzz(50, 80, 2)    # click-click (with pause between)
 
 
 def format_time(us):
