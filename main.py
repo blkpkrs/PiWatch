@@ -2,6 +2,7 @@
 from machine import Pin, I2C
 from ssd1306 import SSD1306_I2C
 import framebuf
+import random
 import rp2
 import time
 
@@ -12,6 +13,8 @@ BOOTSEL_HOLD_MS = 1000      # 1-second hold to reset
 TARGET_FPS = 20
 FRAME_MS = 1000 // TARGET_FPS
 RESET_FLASH_MS = 250        # how long the RESET tile stays lit after firing
+GLITCH_HOLD_MS = 3000       # hold START + RESET together this long to trigger glitch
+GLITCH_RUN_MS  = 1500       # how long the glitch animation runs once triggered
 
 # --- layout (128x64) ---
 TIME_SCALE = 2              # 8x8 font scaled 2x -> 16x16 per char
@@ -41,6 +44,9 @@ last_tick_us = time.ticks_us()   # delta accumulator: wrap-safe, no drift
 btn_released = True              # only count a press after seeing release (debounce)
 bootsel_press_time = 0
 reset_flash_until  = 0
+glitch_until       = 0     # glitch animation runs until this time
+both_press_time    = 0     # when START+RESET started being held together
+in_glitch          = False
 last_draw_ms = 0
 
 # cached render state, so we only repaint what actually changed
@@ -103,20 +109,45 @@ def draw_tile(x, w, label, inverted, progress):
             oled.fill_rect(bx + 1, by + 1, fw, bh - 2, fg)
 
 
+def full_redraw():
+    """Clear and repaint the whole screen (used at boot and after a glitch)."""
+    global prev_left, prev_right
+    oled.fill(0)
+    oled.hline(0, SEP_Y, 128, 1)
+    prev_time_chars[:] = [None] * 8          # force full time repaint
+    draw_time(format_time(elapsed_us))
+    label = "STOP" if running else "START"
+    draw_tile(BTN_L_X, BTN_L_W, label, False, 0)
+    draw_tile(BTN_R_X, BTN_R_W, "RESET", False, 0)
+    oled.show()
+    prev_left  = (label, False)
+    prev_right = (False, 0)
+
+
+def glitch_frame():
+    """One frame of screen corruption: tear a few rows, scatter static."""
+    for _ in range(5):                                   # horizontal row tears
+        y = random.randrange(64)
+        dx = random.choice((-12, -8, -4, 4, 8, 12))
+        row = [oled.pixel(x, y) for x in range(128)]
+        oled.fill_rect(0, y, 128, 1, 0)
+        for x in range(128):
+            if row[(x - dx) % 128]:
+                oled.pixel(x, y, 1)
+    for _ in range(6):                                   # static blocks
+        oled.fill_rect(random.randrange(128), random.randrange(64),
+                       random.randrange(1, 20), random.randrange(1, 3),
+                       1 if random.random() < 0.5 else 0)
+
+
 # --- first paint ---
-oled.fill(0)
-oled.hline(0, SEP_Y, 128, 1)
-draw_time(format_time(0))
-draw_tile(BTN_L_X, BTN_L_W, "START", False, 0)
-draw_tile(BTN_R_X, BTN_R_W, "RESET", False, 0)
-oled.show()
-prev_left  = ("START", False)
-prev_right = (False, 0)
+full_redraw()
 
 print("=" * 50)
 print("STOPWATCH READY")
 print("  - GP16 button tap: start/stop")
 print("  - BOOTSEL hold 1s: reset time (only when stopped)")
+print("  - hold START + RESET 3s: glitch")
 print("=" * 50)
 
 while True:
@@ -157,32 +188,49 @@ while True:
     else:
         bootsel_press_time = 0          # released, clear timer
 
+    # --- hold START + RESET together for 3s -> glitch burst ---
+    if gp16_down and bs == 1:
+        if both_press_time == 0:
+            both_press_time = now_ms
+        elif time.ticks_diff(now_ms, both_press_time) >= GLITCH_HOLD_MS:
+            glitch_until = time.ticks_add(now_ms, GLITCH_RUN_MS)
+            print("GLITCH (hold START+RESET)")
+            both_press_time = 0         # latch once per hold
+
     # --- render at a fixed rate, pushing to I2C only when something changed ---
     if time.ticks_diff(now_ms, last_draw_ms) >= FRAME_MS:
         last_draw_ms = now_ms
-        dirty = draw_time(format_time(elapsed_us))
-
-        left = ("STOP" if running else "START", gp16_down)
-        if left != prev_left:
-            draw_tile(BTN_L_X, BTN_L_W, left[0], left[1], 0)
-            prev_left = left
-            dirty = True
-
-        # reset tile: fills as BOOTSEL is held, then flashes solid when it fires
-        flashing = time.ticks_diff(reset_flash_until, now_ms) > 0
-        progress = 0.0
-        if not running and hold_ms > 0:
-            progress = hold_ms / BOOTSEL_HOLD_MS
-            if progress > 1.0:
-                progress = 1.0
-        # bucket the bar so we only repaint on a visible step, not every frame
-        right = (flashing, int(progress * 12))
-        if right != prev_right:
-            draw_tile(BTN_R_X, BTN_R_W, "RESET", flashing, progress)
-            prev_right = right
-            dirty = True
-
-        if dirty:
+        if time.ticks_diff(glitch_until, now_ms) > 0:      # glitch burst in progress
+            in_glitch = True
+            glitch_frame()
             oled.show()
+        else:
+            if in_glitch:                                  # just finished -> clean restore
+                full_redraw()
+                in_glitch = False
+            dirty = draw_time(format_time(elapsed_us))
+
+            left = ("STOP" if running else "START", gp16_down)
+            if left != prev_left:
+                draw_tile(BTN_L_X, BTN_L_W, left[0], left[1], 0)
+                prev_left = left
+                dirty = True
+
+            # reset tile: fills as BOOTSEL is held, then flashes solid when it fires
+            flashing = time.ticks_diff(reset_flash_until, now_ms) > 0
+            progress = 0.0
+            if not running and hold_ms > 0:
+                progress = hold_ms / BOOTSEL_HOLD_MS
+                if progress > 1.0:
+                    progress = 1.0
+            # bucket the bar so we only repaint on a visible step, not every frame
+            right = (flashing, int(progress * 12))
+            if right != prev_right:
+                draw_tile(BTN_R_X, BTN_R_W, "RESET", flashing, progress)
+                prev_right = right
+                dirty = True
+
+            if dirty:
+                oled.show()
 
     time.sleep_ms(5)    # short poll so button taps are not missed
