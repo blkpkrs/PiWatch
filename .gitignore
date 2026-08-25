@@ -1,0 +1,6 @@
+# Third-party SSD1306 driver fork (upip/micropython-ssd1306)
+# Copy micropython-ssd1306/ssd1306.py onto the Pico to run.
+micropython-ssd1306/
+
+# macOS
+.DS_Store
