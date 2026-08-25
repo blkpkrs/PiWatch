@@ -17,8 +17,7 @@ TRIPLE_TAP_WINDOW_MS = 500  # window to register triple-tap for glitch
 GLITCH_RUN_MS  = 1500       # how long the glitch animation runs once triggered
 BUZZER_PIN = 15             # PWM pin for passive buzzer (Pin 20)
 BUZZER_ENABLED = True       # set False to mute buzzer
-BUZZER_DUTY = 32768         # 50% duty = loudest. 0 and 65535 are BOTH silent:
-                            # at 100% the pin never toggles, so there is no waveform.
+BUZZER_DUTY = 16384         # 25% duty — quieter. Range: 0 (silent) to 65535 (100%, silent).
 
 # --- layout (128x64) ---
 TIME_SCALE = 2              # 8x8 font scaled 2x -> 16x16 per char
