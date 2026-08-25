@@ -13,6 +13,7 @@ TARGET_FPS = 20
 FRAME_MS = 1000 // TARGET_FPS
 RESET_FLASH_MS = 250        # how long the RESET tile stays lit after firing
 BUZZER_PIN = 15             # PWM pin for passive buzzer (Pin 20)
+# BUZZER_PIN = 0              # fallback: try Pin 1 (GP0) if GP15 is dead
 BUZZER_ENABLED = True       # set False to mute buzzer
 
 # --- layout (128x64) ---
@@ -40,6 +41,15 @@ btn = Pin(16, Pin.IN, Pin.PULL_UP)
 buzzer = PWM(Pin(BUZZER_PIN))
 buzzer.freq(1000)
 buzzer.duty_u16(0)  # start silent
+
+# --- GP15 diagnostic: toggle to verify output ---
+test_pin = Pin(15, Pin.OUT)
+print("DIAG: toggling GP15 — measure voltage at base resistor...")
+for _ in range(20):
+    test_pin.toggle()
+    time.sleep_ms(100)
+test_pin.value(0)  # stop toggling
+print("DIAG: done")
 
 # --- state ---
 running      = False
