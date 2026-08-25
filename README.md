@@ -28,13 +28,6 @@ A feature-rich stopwatch built on the **Raspberry Pi Pico 2** with a 128×64 OLE
 | Momentary push button | 1 | For start/stop toggle |
 | Passive buzzer | 1 | Piezo type — requires PWM/toggling signal (NOT active buzzer) |
 
-### Optional Components
-| Component | Quantity | Notes |
-|-----------|----------|-------|
-| 2N222A NPN transistor | 1 | Only needed for magnetic buzzer (>30mA). Piezo buzzers can be driven directly from GPIO |
-| 1kΩ resistor | 1 | Base current limiting (if using transistor) |
-| LED (any color) | 1 | Optional flyback diode substitute when using transistor |
-
 ### Power
 - **USB power** via Pico's USB port (recommended for development)
 - **Battery** (optional): Single-cell LiPo (3.0–4.2V) connected to **VSYS** (Pin 39), NOT 3V3_OUT
@@ -58,43 +51,12 @@ A feature-rich stopwatch built on the **Raspberry Pi Pico 2** with a 128×64 OLE
 | Other leg  | Any GND           | GND       | Connect to any ground pin (e.g., Pin 38) |
 
 ### Passive Buzzer
-**For piezo buzzers (recommended):** Drive directly from GPIO — no transistor needed.
+Drive directly from GPIO — no transistor needed.
 
 | Buzzer Pin | Pico Physical Pin | Pico GPIO | Notes |
 |------------|-------------------|-----------|-------|
 | (+)        | 20                | GP15      | PWM output pin |
 | (−)        | 38                | GND       | Ground |
-
-**For magnetic buzzers (>30mA):** Use transistor switch.
-
-```
-GP15 (Pin 20) ──► 1kΩ resistor ──► Transistor Base
-Transistor Emitter ───────────────► GND (Pin 38)
-
-3V3_OUT (Pin 36) ──► Buzzer (+)
-Buzzer (-) ─────────► Transistor Collector
-
-LED (optional flyback):
-  Cathode (short leg) ──► Buzzer (+) / 3V3
-  Anode (long leg) ─────► Transistor Collector
-```
-
-### Transistor Pin Identification (2N222A)
-Hold the transistor with the **flat side facing you**, legs pointing down:
-
-```
-    Flat side facing you
-   ┌──────────────┐
-   │  2N222A      │
-   │              │
-   └──┬───┬───┬───┘
-      │   │   │
-     Base Collector Emitter
-```
-
-- **Base (left):** Connects to 1kΩ resistor → GP15
-- **Collector (middle):** Connects to buzzer (-) and LED anode
-- **Emitter (right):** Connects directly to GND
 
 ---
 
@@ -204,9 +166,8 @@ Edit `main.py` to customize behavior:
 
 ### Buzzer Not Working
 1. **No sound:** Verify buzzer is passive (not active). Try direct GPIO drive: GP15 → buzzer (+), GND → buzzer (−)
-2. **Stuck on:** Transistor may be shorted — replace it or bypass with direct GPIO
-3. **Too quiet:** Increase `BUZZER_DUTY` (try 24576 for ~37.5%)
-4. **Too loud:** Decrease `BUZZER_DUTY` (try 8192 for ~12.5%)
+2. **Too quiet:** Increase `BUZZER_DUTY` (try 24576 for ~37.5%)
+3. **Too loud:** Decrease `BUZZER_DUTY` (try 8192 for ~12.5%)
 
 ### Button Not Responding
 - Verify button is wired to GP16 (Pin 21) and GND
