@@ -101,12 +101,14 @@ Hold the transistor with the **flat side facing you**, legs pointing down:
 ## Software Setup
 
 ### 1. Flash MicroPython Firmware
-Download the latest RP2350 MicroPython firmware from [micropython.org](https://micropython.org/download/).
+Firmware files are included in the `Micropython UF2/` folder:
+- **`RPI_PICO2-*.uf2`** — For Raspberry Pi Pico 2 (non-W)
+- **`RPI_PICO2_W-*.uf2`** — For Raspberry Pi Pico 2 W
 
 1. Hold the **BOOTSEL** button on the Pico
 2. Connect USB to your computer
 3. A drive named `RPI-RP2` will appear
-4. Drag the `.uf2` firmware file onto it
+4. Drag the appropriate `.uf2` file onto it (Pico 2 or Pico 2 W)
 5. The Pico will reboot with MicroPython
 
 ### 2. Upload Project Files
@@ -117,13 +119,32 @@ Using **Thonny IDE** (recommended):
 3. Click **STOP** (to release the REPL)
 4. Open **View → Files**
 5. Upload these files to `/` (root of Pico):
-   - `main.py` — Main application code
-   - `ssd1306.py` — OLED driver (from `/micropython-ssd1306/`)
+   - `main.py` — Main application code (from `/Python Files/`)
+   - `ssd1306.py` — OLED driver (from `/Python Files/`)
 
 ### 3. Run the Project
 The Pico will auto-run `main.py` on boot. If Thonny captures the REPL:
 - Click **STOP** to halt execution
 - Or hold `Ctrl+C` while connecting
+
+---
+
+## Project Structure
+
+```
+├── Micropython UF2/           MicroPython firmware files
+│   ├── RPI_PICO2-*.uf2        Firmware for Pico 2 (non-W)
+│   └── RPI_PICO2_W-*.uf2      Firmware for Pico 2 W
+├── Python Files/              MicroPython source files to upload
+│   ├── main.py                Main application code
+│   └── ssd1306.py             OLED driver library
+├── pico2_pinout.md            Pin and protocol reference
+└── README.md                  This file
+```
+
+**Both `main.py` and `ssd1306.py` must be uploaded to the Pico's root (`/`).** A freshly
+flashed board has neither. `main.py` line 3 does `from ssd1306 import SSD1306_I2C` and
+will fail without it.
 
 ---
 
