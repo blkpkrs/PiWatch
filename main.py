@@ -1,5 +1,5 @@
 # main.py — stopwatch, GME12864-11 / SSD1306 128x64
-from machine import Pin, I2C
+from machine import Pin, I2C, PWM
 from ssd1306 import SSD1306_I2C
 import framebuf
 import rp2
@@ -12,6 +12,8 @@ BOOTSEL_HOLD_MS = 1000      # 1-second hold to reset
 TARGET_FPS = 20
 FRAME_MS = 1000 // TARGET_FPS
 RESET_FLASH_MS = 250        # how long the RESET tile stays lit after firing
+BUZZER_PIN = 15             # PWM pin for passive buzzer (Pin 20)
+BUZZER_ENABLED = True       # set False to mute buzzer
 
 # --- layout (128x64) ---
 TIME_SCALE = 2              # 8x8 font scaled 2x -> 16x16 per char
@@ -34,6 +36,11 @@ oled = SSD1306_I2C(128, 64, i2c, addr=0x3C)
 # Button on GP16 to GND — start/stop toggle
 btn = Pin(16, Pin.IN, Pin.PULL_UP)
 
+# Passive buzzer on GP15 (PWM) — transistor switch to GND
+buzzer = PWM(Pin(BUZZER_PIN))
+buzzer.freq(1000)
+buzzer.duty_u16(0)  # start silent
+
 # --- state ---
 running      = False
 elapsed_us   = 0
@@ -47,6 +54,31 @@ last_draw_ms = 0
 prev_time_chars = [None] * 8
 prev_left  = None                # (label, inverted)
 prev_right = None                # (inverted, progress_bucket)
+
+
+# --- buzzer: context-aware beep tones ---
+def beep(freq, duration_ms):
+    """Play a tone at `freq` Hz for `duration_ms`. Non-blocking if buzzer already on."""
+    if not BUZZER_ENABLED:
+        return
+    buzzer.freq(freq)
+    buzzer.duty_u16(32768)  # 50% duty cycle
+    time.sleep_ms(duration_ms)
+    buzzer.duty_u16(0)      # stop
+
+def beep_start():
+    """Medium ascending beep — action confirmed."""
+    beep(2000, 150)
+
+def beep_stop():
+    """Short descending beep — pause acknowledged."""
+    beep(1500, 80)
+
+def beep_reset():
+    """Distinct double-beep — different action."""
+    beep(1000, 80)
+    time.sleep_ms(50)
+    beep(1200, 80)
 
 
 def format_time(us):
@@ -137,6 +169,10 @@ while True:
     gp16_down = (btn_val == 0)
     if gp16_down and btn_released:      # pressed, and we saw a release first
         running = not running
+        if running:
+            beep_start()
+        else:
+            beep_stop()
         print(f"{'START' if running else 'STOP'}: {format_time(elapsed_us)}")
     btn_released = not gp16_down
 
@@ -151,6 +187,7 @@ while True:
             if not running:
                 elapsed_us = 0
                 reset_flash_until = time.ticks_add(now_ms, RESET_FLASH_MS)
+                beep_reset()
                 print("RESET (BOOTSEL hold)")
             bootsel_press_time = 0      # clear so the next press can trigger again
             hold_ms = 0
