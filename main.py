@@ -14,7 +14,7 @@ TARGET_FPS = 20
 FRAME_MS = 1000 // TARGET_FPS
 RESET_FLASH_MS = 250        # how long the RESET tile stays lit after firing
 TRIPLE_TAP_WINDOW_MS = 500  # window to register triple-tap for glitch
-GLITCH_RUN_MS  = 1500       # how long the glitch animation runs once triggered
+GLITCH_RUN_MS  = 3000       # how long the glitch animation runs once triggered
 BUZZER_PIN = 15             # PWM pin for passive buzzer (Pin 20)
 BUZZER_ENABLED = True       # set False to mute buzzer
 BUZZER_DUTY = 16384         # 25% duty — quieter. Range: 0 (silent) to 65535 (100%, silent).
@@ -92,11 +92,13 @@ def beep_reset():
 
 def beep_glitch():
     """Descending noise burst — glitch triggered."""
-    tone(3000, 40)
-    time.sleep_ms(20)
-    tone(1500, 40)
-    time.sleep_ms(20)
-    tone(800, 100)
+    tone(3000, 150)
+    time.sleep_ms(80)
+    tone(2000, 150)
+    time.sleep_ms(80)
+    tone(1200, 150)
+    time.sleep_ms(80)
+    tone(600, 200)
 
 
 def format_time(us):
