@@ -13,7 +13,7 @@ BOOTSEL_HOLD_MS = 1000      # 1-second hold to reset
 TARGET_FPS = 20
 FRAME_MS = 1000 // TARGET_FPS
 RESET_FLASH_MS = 250        # how long the RESET tile stays lit after firing
-GLITCH_HOLD_MS = 3000       # hold START + RESET together this long to trigger glitch
+TRIPLE_TAP_WINDOW_MS = 2000 # window to register triple-tap for glitch
 GLITCH_RUN_MS  = 1500       # how long the glitch animation runs once triggered
 
 # --- layout (128x64) ---
@@ -45,8 +45,8 @@ btn_released = True              # only count a press after seeing release (debo
 bootsel_press_time = 0
 reset_flash_until  = 0
 glitch_until       = 0     # glitch animation runs until this time
-both_press_time    = 0     # when START+RESET started being held together
 in_glitch          = False
+tap_times          = []    # timestamps of recent START/STOP taps for triple-tap detection
 last_draw_ms = 0
 
 # cached render state, so we only repaint what actually changed
@@ -151,7 +151,7 @@ print("=" * 50)
 print("STOPWATCH READY")
 print("  - GP16 button tap: start/stop")
 print("  - BOOTSEL hold 1s: reset time (only when stopped)")
-print("  - hold START + RESET 3s: glitch")
+print("  - triple-tap GP16 within 2s: glitch")
 print("=" * 50)
 
 while True:
@@ -167,39 +167,48 @@ while True:
     if running:
         elapsed_us += dt_us
 
-    # --- GP16 button: start/stop toggle (active low, one trigger per press) ---
-    btn_val = btn.value()
-    gp16_down = (btn_val == 0)
-    if gp16_down and btn_released:      # pressed, and we saw a release first
-        running = not running
-        print(f"{'START' if running else 'STOP'}: {format_time(elapsed_us)}")
-    btn_released = not gp16_down
-
-    # --- BOOTSEL: reset only (1-second hold, only while stopped) ---
-    bs = rp2.bootsel_button()           # 1=pressed, 0=released
+    # --- freeze all button processing during glitch animation ---
+    gp16_down = False
     hold_ms = 0
-    if bs == 1:
-        if bootsel_press_time == 0:
-            bootsel_press_time = now_ms
-        hold_ms = time.ticks_diff(now_ms, bootsel_press_time)
-        if hold_ms >= BOOTSEL_HOLD_MS:
-            if not running:
-                elapsed_us = 0
-                reset_flash_until = time.ticks_add(now_ms, RESET_FLASH_MS)
-                print("RESET (BOOTSEL hold)")
-            bootsel_press_time = 0      # clear so the next press can trigger again
-            hold_ms = 0
-    else:
-        bootsel_press_time = 0          # released, clear timer
+    if not in_glitch:
+        # --- GP16 button: start/stop toggle (active low, one trigger per press) ---
+        btn_val = btn.value()
+        gp16_down = (btn_val == 0)
 
-    # --- hold START + RESET together for 3s -> glitch burst ---
-    if gp16_down and bs == 1:
-        if both_press_time == 0:
-            both_press_time = now_ms
-        elif time.ticks_diff(now_ms, both_press_time) >= GLITCH_HOLD_MS:
-            glitch_until = time.ticks_add(now_ms, GLITCH_RUN_MS)
-            print("GLITCH (hold START+RESET)")
-            both_press_time = 0         # latch once per hold
+        if gp16_down and btn_released:      # pressed, and we saw a release first
+            # --- triple-tap detection for glitch trigger ---
+            tap_times.append(now_ms)
+            # remove taps older than the window
+            while tap_times and time.ticks_diff(now_ms, tap_times[0]) > TRIPLE_TAP_WINDOW_MS:
+                tap_times.pop(0)
+            if len(tap_times) >= 3:
+                # triple-tap detected -> trigger glitch
+                glitch_until = time.ticks_add(now_ms, GLITCH_RUN_MS)
+                in_glitch = True
+                tap_times.clear()
+                print("GLITCH (triple-tap)")
+            else:
+                # normal start/stop toggle
+                running = not running
+                print(f"{'START' if running else 'STOP'}: {format_time(elapsed_us)}")
+        btn_released = not gp16_down
+
+        # --- BOOTSEL: reset only (1-second hold, only while stopped) ---
+        bs = rp2.bootsel_button()           # 1=pressed, 0=released
+        hold_ms = 0
+        if bs == 1:
+            if bootsel_press_time == 0:
+                bootsel_press_time = now_ms
+            hold_ms = time.ticks_diff(now_ms, bootsel_press_time)
+            if hold_ms >= BOOTSEL_HOLD_MS:
+                if not running:
+                    elapsed_us = 0
+                    reset_flash_until = time.ticks_add(now_ms, RESET_FLASH_MS)
+                    print("RESET (BOOTSEL hold)")
+                bootsel_press_time = 0      # clear so the next press can trigger again
+                hold_ms = 0
+        else:
+            bootsel_press_time = 0          # released, clear timer
 
     # --- render at a fixed rate, pushing to I2C only when something changed ---
     if time.ticks_diff(now_ms, last_draw_ms) >= FRAME_MS:
