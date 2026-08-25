@@ -13,7 +13,7 @@ BOOTSEL_HOLD_MS = 1000      # 1-second hold to reset
 TARGET_FPS = 20
 FRAME_MS = 1000 // TARGET_FPS
 RESET_FLASH_MS = 250        # how long the RESET tile stays lit after firing
-TRIPLE_TAP_WINDOW_MS = 2000 # window to register triple-tap for glitch
+TRIPLE_TAP_WINDOW_MS = 800  # window to register triple-tap for glitch
 GLITCH_RUN_MS  = 1500       # how long the glitch animation runs once triggered
 
 # --- layout (128x64) ---
@@ -151,7 +151,7 @@ print("=" * 50)
 print("STOPWATCH READY")
 print("  - GP16 button tap: start/stop")
 print("  - BOOTSEL hold 1s: reset time (only when stopped)")
-print("  - triple-tap GP16 within 2s: glitch")
+print("  - triple-tap GP16 within 0.8s: glitch")
 print("=" * 50)
 
 while True:
