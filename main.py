@@ -80,8 +80,8 @@ def tone(freq_hz, ms, gap_ms=0):
 
 def beep_start():
     """Gentle ascending sweep — timing has begun."""
-    tone(800, 120, 40)
-    tone(1400, 100)
+    tone(1400, 120, 40)
+    tone(1800, 100)
 
 def beep_stop():
     """Single lower tone — paused."""
