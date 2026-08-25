@@ -129,11 +129,15 @@ def glitch_frame():
     for _ in range(5):                                   # horizontal row tears
         y = random.randrange(64)
         dx = random.choice((-12, -8, -4, 4, 8, 12))
-        row = [oled.pixel(x, y) for x in range(128)]
+        # tear the row by drawing random black/white segments
         oled.fill_rect(0, y, 128, 1, 0)
-        for x in range(128):
-            if row[(x - dx) % 128]:
-                oled.pixel(x, y, 1)
+        x = 0
+        while x < 128:
+            seg_w = random.randint(2, 15)
+            if x + seg_w > 128:
+                seg_w = 128 - x
+            oled.fill_rect(x, y, seg_w, 1, random.randint(0, 1))
+            x += seg_w
     for _ in range(6):                                   # static blocks
         oled.fill_rect(random.randrange(128), random.randrange(64),
                        random.randrange(1, 20), random.randrange(1, 3),
