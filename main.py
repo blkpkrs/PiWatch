@@ -38,7 +38,7 @@ btn = Pin(16, Pin.IN, Pin.PULL_UP)
 
 # Passive buzzer on GP15 (PWM) — transistor switch to GND
 buzzer = PWM(Pin(BUZZER_PIN))
-buzzer.freq(1000)
+buzzer.freq(2000)
 buzzer.duty_u16(0)  # start silent
 
 # --- state ---
@@ -62,7 +62,7 @@ def beep(freq, duration_ms):
     if not BUZZER_ENABLED:
         return
     buzzer.freq(freq)
-    buzzer.duty_u16(32768)  # 50% duty cycle
+    buzzer.duty_u16(65535)  # 100% duty cycle for max current
     time.sleep_ms(duration_ms)
     buzzer.duty_u16(0)      # stop
 
