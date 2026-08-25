@@ -1,263 +1,251 @@
-# PiWatch — Stopwatch with OLED Display & Buzzer
+# ⏱ PiWatch
 
-A feature-rich stopwatch built on the **Raspberry Pi Pico 2** with a 128×64 OLED display, tactile button input, passive buzzer feedback, and a hidden glitch easter egg.
+![MicroPython](https://img.shields.io/badge/MicroPython-1.29.0-2b2728?logo=micropython)
+![Board](https://img.shields.io/badge/Board-Raspberry%20Pi%20Pico%202-c51a4a?logo=raspberrypi)
+![Language](https://img.shields.io/badge/Python-3-3776ab?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/License-Educational-4c1)
 
----
+A centisecond stopwatch on a Raspberry Pi Pico 2 — 128×64 OLED, one button, and a buzzer.
 
-## Features
-
-| Feature | Description |
-|---------|-------------|
-| **Stopwatch** | Start/stop timing with centisecond precision (MM:SS.CC format) |
-| **OLED Display** | 128×64 SSD1306 display with scaled time text and reactive UI tiles |
-| **Button Input** | Start/stop toggle via momentary button on GP16 |
-| **Reset** | Hold BOOTSEL button for 1 second to reset (only when stopped) |
-| **Buzzer Feedback** | Context-aware tones on start, stop, and reset actions |
-| **Glitch Easter Egg** | Triple-tap GP16 within 0.5 seconds to trigger a 3-second screen corruption animation with descending noise sound |
-| **Timer Pause** | Time automatically pauses after glitch until user restarts |
+<!-- Drop a photo or GIF of the finished build here:
+     ![PiWatch](docs/piwatch.jpg)                        -->
 
 ---
 
-## Hardware Requirements
+## Quick Start
 
-### Core Components
-| Component | Quantity | Notes |
-|-----------|----------|-------|
-| Raspberry Pi Pico 2 (RP2350) | 1 | Or Pico 2 W (note: wireless pins unavailable) |
-| SSD1306 OLED Display (128×64) | 1 | I2C interface, address 0x3C or 0x3D |
-| Momentary push button | 1 | For start/stop toggle |
-| Passive buzzer | 1 | Piezo type — requires PWM/toggling signal (NOT active buzzer) |
-
-### Power
-- **USB power** via Pico's USB port (recommended for development)
-- **Battery** (optional): Single-cell LiPo (3.0–4.2V) connected to **VSYS** (Pin 39), NOT 3V3_OUT
+1. Hold **BOOTSEL**, plug in USB, drag `Micropython UF2/RPI_PICO2-*.uf2` onto the `RPI-RP2` drive.
+2. Wire it up — [8 wires](#wiring), takes two minutes.
+3. Upload **both** files from `Python Files/` to the Pico's root with Thonny. Done.
 
 ---
 
-## Wiring Guide
+## What It Does
 
-### OLED Display (I2C)
-| OLED Pin | Pico Physical Pin | Pico GPIO | Function |
-|----------|-------------------|-----------|----------|
-| VCC      | 36                | 3V3_OUT   | 3.3V power |
-| GND      | 38                | GND       | Ground |
-| SDA      | 6                 | GP4       | I2C data (I2C0) |
-| SCL      | 7                 | GP5       | I2C clock (I2C0) |
-
-### Start/Stop Button
-| Button Leg | Pico Physical Pin | Pico GPIO | Notes |
-|------------|-------------------|-----------|-------|
-| One leg    | 21                | GP16      | Active-low, internal pull-up enabled |
-| Other leg  | Any GND           | GND       | Connect to any ground pin (e.g., Pin 38) |
-
-### Passive Buzzer
-Drive directly from GPIO — no transistor needed.
-
-| Buzzer Pin | Pico Physical Pin | Pico GPIO | Notes |
-|------------|-------------------|-----------|-------|
-| (+)        | 20                | GP15      | PWM output pin |
-| (−)        | 38                | GND       | Ground |
+- **Stopwatch** — `MM:SS.CC`, drift-free, in double-height text across the full display width.
+- **One-button control** — tap to start, tap to stop. Hold BOOTSEL to reset.
+- **Audible feedback** — different tone for start, stop, and reset.
 
 ---
 
-## Software Setup
+## Wiring
 
-### 1. Flash MicroPython Firmware
-Firmware files are included in the `Micropython UF2/` folder:
-- **`RPI_PICO2-*.uf2`** — For Raspberry Pi Pico 2 (non-W)
-- **`RPI_PICO2_W-*.uf2`** — For Raspberry Pi Pico 2 W
+Everything runs at 3.3 V. No transistor, no resistors — the buzzer drives straight from a GPIO.
 
-1. Hold the **BOOTSEL** button on the Pico
-2. Connect USB to your computer
-3. A drive named `RPI-RP2` will appear
-4. Drag the appropriate `.uf2` file onto it (Pico 2 or Pico 2 W)
-5. The Pico will reboot with MicroPython
+### The 8 wires
 
-### 2. Upload Project Files
-Using **Thonny IDE** (recommended):
+| # | From | To | Pico pin |
+|:-:|------|----|----------|
+| 1 | OLED `VCC` | 3V3_OUT | **36** |
+| 2 | OLED `GND` | GND | **38** |
+| 3 | OLED `SDA` | GP4 | **6** |
+| 4 | OLED `SCL` | GP5 | **7** |
+| 5 | Buzzer `+` | GP15 | **20** |
+| 6 | Buzzer `−` | GND | **38** |
+| 7 | Button leg A | GP16 | **21** |
+| 8 | Button leg B | GND | **38** |
 
-1. Open Thonny → Preferences → Interpreter → Select "MicroPython (Raspberry Pi Pico)"
-2. Connect to the Pico
-3. Click **STOP** (to release the REPL)
-4. Open **View → Files**
-5. Upload these files to `/` (root of Pico):
-   - `main.py` — Main application code (from `/Python Files/`)
-   - `ssd1306.py` — OLED driver (from `/Python Files/`)
+Pins 38, and any other `GND`, are interchangeable — three wires share ground.
 
-### 3. Run the Project
-The Pico will auto-run `main.py` on boot. If Thonny captures the REPL:
-- Click **STOP** to halt execution
-- Or hold `Ctrl+C` while connecting
+### Where those pins are
 
----
-
-## Project Structure
+Pin 1 is top-left. Numbering runs **down** the left side (1–20), then **up** the right
+side (21–40). Miscounting here is the single easiest way to damage the board, so check
+the silkscreen on the underside rather than counting.
 
 ```
-├── Micropython UF2/           MicroPython firmware files
-│   ├── RPI_PICO2-*.uf2        Firmware for Pico 2 (non-W)
-│   └── RPI_PICO2_W-*.uf2      Firmware for Pico 2 W
-├── Python Files/              MicroPython source files to upload
-│   ├── main.py                Main application code
-│   └── ssd1306.py             OLED driver library
-├── pico2_pinout.md            Pin and protocol reference
-└── README.md                  This file
+                  ┌─────── USB ───────┐
+                  │                   │
+    OLED SDA   6 ─┤ GP4               │
+    OLED SCL   7 ─┤ GP5               │
+                  │                   │
+                  │    Pico 2         ├─ 40  VBUS
+                  │    (RP2350)       ├─ 39  VSYS     ← battery + (optional)
+                  │                   ├─ 38  GND      ← OLED −, buzzer −, button
+                  │                   ├─ 37  3V3_EN
+                  │                   ├─ 36  3V3_OUT  ← OLED +
+    BUZZER +  20 ─┤ GP15              │
+                  │              GP16 ├─ 21  ← button
+                  └───────────────────┘
+                   pins 1–20            pins 21–40
 ```
 
-**Both `main.py` and `ssd1306.py` must be uploaded to the Pico's root (`/`).** A freshly
-flashed board has neither. `main.py` line 3 does `from ssd1306 import SSD1306_I2C` and
-will fail without it.
+> [!WARNING]
+> **Running on battery?** Connect the cell to **VSYS (pin 39)** — *never* 3V3_OUT (pin 36).
+> Pin 36 is the regulator's **output**; back-driving it destroys the board. This has
+> already killed one Pico on this project. Single-cell LiPo only (3.0–4.2 V); VSYS accepts
+> 1.8–5.5 V via its buck-boost converter.
+
+> [!NOTE]
+> The buzzer must be a **passive** piezo. A passive buzzer has no oscillator of its own and
+> needs a PWM square wave — an *active* buzzer will not work with this firmware.
 
 ---
 
-## Usage Instructions
+## Setup
 
-### Normal Operation
-| Action | How to Trigger | Feedback |
-|--------|---------------|----------|
-| **Start/Stop** | Tap the button on GP16 once | Single 1800 Hz beep (start) or 1200 Hz beep (stop) |
-| **Reset** | Hold BOOTSEL button for 1 second (only when stopped) | Double chirp at 2600 Hz, progress bar on display |
+**Flash MicroPython** — hold BOOTSEL, connect USB, drag the `.uf2` from `Micropython UF2/`
+onto the `RPI-RP2` drive. Use `RPI_PICO2-*.uf2` for the Pico 2, `RPI_PICO2_W-*.uf2` for the W.
 
-### Glitch Easter Egg
-| Action | How to Trigger | Effect |
-|--------|---------------|--------|
-| **Triple-tap** | Tap GP16 button 3 times within 0.5 seconds | Screen corruption animation for 3 seconds with descending noise sound (3000→2000→1200→600 Hz). Timer pauses until user restarts. |
+**Upload the code** — in Thonny: *Preferences → Interpreter → MicroPython (Raspberry Pi Pico)*,
+then **View → Files** and upload both files from `Python Files/` to the Pico's root:
 
-### Display Layout
+| File | Why |
+|------|-----|
+| `main.py` | The application. Auto-runs on boot. |
+| `ssd1306.py` | OLED driver. `main.py` imports it — nothing works without it. |
+
+> [!TIP]
+> `main.py` runs an infinite loop on boot, so Thonny often can't grab the REPL.
+> Click **STOP**, or hold `Ctrl+C` while connecting.
+
+---
+
+## Using It
+
+| Action | Do this | You'll hear |
+|--------|---------|-------------|
+| **Start / Stop** | Tap the button | 1800 Hz (start) · 1200 Hz (stop) |
+| **Reset** | Hold **BOOTSEL** 1 s — only when stopped | Two chirps at 2600 Hz |
+
+The **START** tile inverts while you hold the button. The **RESET** tile fills with a
+progress bar as you hold BOOTSEL — it only appears when stopped, since reset is blocked
+while running.
+
 ```
-┌──────────────────────────────┐
-│  MM:SS.CC   (scaled time)    │
-│                              │
-│──────────────────────────────│  ← Divider line
-│                              │
-│  ┌────────┐  ┌──────────┐   │
-│  │ START  │  │ RESET    │   │  ← UI tiles (inverts when held)
-│  └────────┘  └──────────┘   │
-│                    [████]    │     ← Progress bar (reset hold)
-└──────────────────────────────┘
+ ███     ███             ███     ███             ███     ███    
+█   █   █   █     █     █   █   █   █           █   █   █   █   
+█  ██   █  ██     █     █  ██   █  ██           █  ██   █  ██   
+█ █ █   █ █ █           █ █ █   █ █ █           █ █ █   █ █ █   
+██  █   ██  █     █     ██  █   ██  █           ██  █   ██  █   
+█   █   █   █     █     █   █   █   █    ██     █   █   █   █   
+ ███     ███             ███     ███     ██      ███     ███    
+                                                                
+                                                                
+                                                                
+                                                                
+                                                                
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+                                                                
+                                                                
+▐▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▌▐▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▌
+▐                              ▌▐                              ▌
+▐     ▗▄▖ ▄▄▖ ▗▄  ▄▄  ▄▄▖      ▌▐     ▄▄  ▄▄▖ ▗▄▖ ▄▄▖ ▄▄▖      ▌
+▐     ▌    ▌  ▌ ▌ ▌ ▌  ▌       ▌▐     ▌ ▌ ▌   ▌   ▌    ▌       ▌
+▐     ▝▀▖  ▌  ▛▀▌ ▛▛   ▌       ▌▐     ▛▛  ▛▀  ▝▀▖ ▛▀   ▌       ▌
+▐     ▄▄▘  ▌  ▌ ▌ ▌▝▖  ▌       ▌▐     ▌▝▖ ▙▄▖ ▄▄▘ ▙▄▖  ▌       ▌
+▐                              ▌▐                              ▌
+▐                              ▌▐                              ▌
+▐                              ▌▐                              ▌
+▐                              ▌▐                              ▌
+▐▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▌▐▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▌
+```
+
+```mermaid
+stateDiagram-v2
+    direction LR
+    [*] --> Stopped
+    Stopped --> Running: tap
+    Running --> Stopped: tap
+    Stopped --> Stopped: hold BOOTSEL 1s → 00:00.00
 ```
 
 ---
 
 ## Configuration
 
-Edit `main.py` to customize behavior:
+<details>
+<summary>Constants in <code>main.py</code></summary>
 
 | Constant | Default | Description |
 |----------|---------|-------------|
-| `I2C_FREQ` | 400,000 | I2C clock speed (Hz) |
-| `BOOTSEL_HOLD_MS` | 1000 | Hold time for reset (ms) |
-| `TARGET_FPS` | 20 | Display refresh rate |
-| `RESET_FLASH_MS` | 250 | Duration of reset confirmation flash (ms) |
-| `TRIPLE_TAP_WINDOW_MS` | 500 | Window to detect triple-tap for glitch (ms) |
-| `GLITCH_RUN_MS` | 3000 | Duration of glitch animation (ms) |
-| `BUZZER_PIN` | 15 | GPIO pin for buzzer control |
-| `BUZZER_ENABLED` | True | Enable/disable buzzer output |
-| `BUZZER_DUTY` | 16384 | PWM duty cycle (0=silent, 32768=50%, 65535=silent) |
+| `I2C_FREQ` | `400_000` | I2C clock (Hz). Drop to `100_000` if wiring is long. |
+| `BOOTSEL_HOLD_MS` | `1000` | Hold time to reset (ms) |
+| `TARGET_FPS` | `20` | Display refresh rate |
+| `RESET_FLASH_MS` | `250` | Reset confirmation flash (ms) |
+| `TRIPLE_TAP_WINDOW_MS` | `500` | Window for triple-tap detection (ms) |
+| `GLITCH_RUN_MS` | `3000` | Glitch animation length (ms) |
+| `BUZZER_PIN` | `15` | Buzzer GPIO |
+| `BUZZER_ENABLED` | `True` | Set `False` to mute |
+| `BUZZER_DUTY` | `16384` | 25% duty — quieter. **`0` and `65535` are both silent**; 32768 (50%) is loudest. |
+
+Piezo buzzers are far louder at their resonant frequency, usually 2–4 kHz. To find yours:
+
+```python
+from machine import Pin, PWM
+import time
+b = PWM(Pin(15))
+for f in range(500, 5001, 250):
+    b.freq(f); b.duty_u16(32768); print(f, "Hz"); time.sleep_ms(300)
+b.duty_u16(0)
+```
+
+</details>
+
+<details>
+<summary>How it works</summary>
+
+**Timing** — `elapsed_us` accumulates small per-loop integer-microsecond deltas rather than
+one long span. This is wrap-safe (`ticks_us()` rolls over every 2³⁰ µs, and `ticks_diff()`
+is only valid across ±2²⁹ µs) and drift-free, since it's exact integers throughout.
+
+**Rendering** — `oled.show()` pushes the entire 1024-byte framebuffer, about 23 ms at
+400 kHz, so it only fires when something actually changed. `draw_time()` diffs per
+character, repainting just the digits that moved — usually 1 or 2 of 8. Idle costs zero
+I2C traffic.
+
+**Big text** — `framebuf` has no scaling, so `draw_char_scaled()` rasterises each 8×8 glyph
+into a scratch buffer and expands every set pixel into a 2×2 block. Eight characters ×
+16 px = exactly 128 px, so the time fills the width precisely. 2× is the ceiling; 3× would
+need 192 px.
+
+**Input** — GP16 is active-low with an internal pull-up, edge-detected so one press gives
+one toggle. BOOTSEL is polled via `rp2.bootsel_button()`, which returns **1 when pressed**.
+
+</details>
 
 ---
 
 ## Troubleshooting
 
-### OLED Not Displaying
-1. **I2C scan returns empty:** Check SDA/SCL wiring (Pins 6/7), verify OLED power, try address 0x3D
-2. **Display shows garbage:** Lower `I2C_FREQ` to 100,000
-3. **No power:** Verify OLED VCC is connected to Pin 36 (3V3_OUT), not Pin 40 (VBUS)
-
-### Buzzer Not Working
-1. **No sound:** Verify buzzer is passive (not active). Try direct GPIO drive: GP15 → buzzer (+), GND → buzzer (−)
-2. **Too quiet:** Increase `BUZZER_DUTY` (try 24576 for ~37.5%)
-3. **Too loud:** Decrease `BUZZER_DUTY` (try 8192 for ~12.5%)
-
-### Button Not Responding
-- Verify button is wired to GP16 (Pin 21) and GND
-- Check for loose breadboard connections
-- Try a different button or jumper wire
-
-### Glitch Not Triggering
-- You must tap GP16 three times within 0.5 seconds
-- Wait for display to settle before attempting triple-tap
-- Check Thonny console for `"GLITCH (triple-tap)"` message
-
-### General Tips
-- **Reseat all wires** — breadboard connections can become loose
-- **Try different jumper wires** — they can fail internally
-- **Check breadboard rows** — rows can have internal breaks; try moving wires to different rows
-- **Power cycle the Pico** — unplug USB, wait 5 seconds, replug
-- **Verify MicroPython firmware** — if issues persist, reflash the Pico
+| Symptom | Check |
+|---------|-------|
+| `I2C scan: []` | SDA on pin 6, SCL on pin 7. Reseat wires. Try address `0x3D`. |
+| Display blank but scan works | OLED `VCC` on pin **36**, not 39. |
+| No sound | Passive buzzer, not active? Run the frequency sweep above. |
+| Buzzer quiet | Raise `BUZZER_DUTY` toward `32768` — **not** past it. |
+| Resets on its own | Should not happen; `rp2.bootsel_button()` returns 1 when pressed. |
+| Thonny won't connect | Charge-only USB cable. Try another. |
 
 ---
 
-## Battery Operation (Optional)
+## Project Structure
 
-### Wiring
 ```
-LiPo RED (+)  ──────────────► Pin 39 (VSYS)
-LiPo BLACK (−) ─────────────► Pin 38 (GND)
+Micropython UF2/     Firmware — RPI_PICO2-*.uf2 (Pico 2) · RPI_PICO2_W-*.uf2 (Pico 2 W)
+Python Files/        main.py + ssd1306.py — upload BOTH to the Pico's root
+README.md            This file
 ```
 
-### Important Warnings
-- **NEVER connect battery to Pin 36 (3V3_OUT)** — this will destroy the Pico
-- **NEVER connect battery to Pin 40 (VBUS)** — this can damage the USB port
-- The Pico **cannot charge** the battery — use a TP4056 module or similar charger
-- Add a Schottky diode (1N5817/SS14/BAT43) from battery to VSYS for safe USB+battery operation
+---
 
-### Runtime Estimate
-- **~4.5–5.5 hours** on a 350 mAh LiPo cell
-- To extend: reduce OLED contrast with `oled.contrast(0x01)` or power off display on idle timeout
+<sub>*There's something hidden in the button handling. Try tapping it three times, quickly.*</sub>
 
 ---
 
-## Technical Details
+## Credits
 
-### Timing Architecture
-- Elapsed time accumulates from per-loop integer-microsecond deltas using `time.ticks_diff()`
-- Wrap-safe: handles the 2³⁰ µs wrap of `ticks_us()` correctly
-- Drift-free: exact integer microseconds in and out
-
-### Rendering Optimization
-- Fixed ~20 FPS gate, but `oled.show()` only fires when something changed
-- Per-character diffing in time display — only repaints digits that actually changed
-- Tile state caching prevents redundant redraws
-
-### Input Handling
-- GP16 is active-low with internal pull-up, edge-detected via `btn_released`
-- BOOTSEL is polled via `rp2.bootsel_button()` (1 = pressed, 0 = released)
-- Triple-tap detection uses a sliding window of recent tap timestamps
-
-### Buzzer Implementation
-- Passive piezo buzzer driven by PWM at 50% duty cycle (loudest square wave)
-- Context-aware tones: different frequencies and patterns for each action
-- Non-blocking glitch sound using state-machine approach during animation
-
----
-
-## Credits & AI Attribution
-
-This project was developed with assistance from multiple AI models:
+Built with assistance from several AI models:
 
 | Model | Contribution |
 |-------|-------------|
-| **Qwen 3.82-27B** | Core stopwatch functionality, I2C OLED integration, time accumulation logic, display rendering, button handling, and initial architecture |
-| **Qwen 3.6-35B-A3B** | Buzzer implementation, glitch easter egg mechanics, triple-tap detection, non-blocking sound system, and UI tile rendering |
-| **Claude Opus 5** (High Effort) | Major bug fixes including BOOTSEL polarity correction, I2C pinout resolution, PWM duty cycle understanding, time accumulation wrap handling, and comprehensive troubleshooting guidance |
+| **Qwen 3.82-27B** | Core stopwatch, I2C OLED integration, time accumulation, display rendering, button handling, initial architecture |
+| **Qwen 3.6-35B-A3B** | Buzzer implementation, glitch easter egg, triple-tap detection, non-blocking sound, UI tile rendering |
+| **Claude Opus 5** | Bug fixes — BOOTSEL polarity, `ticks_us()` wrap handling, PWM duty-cycle correction, I2C pinout resolution. Hardware troubleshooting. Authored this README, including the wiring guide and display mockups. |
 
-### References
-- **OLED Driver:** [micropython-ssd1306](https://github.com/mcauser/micropython-ssd1306)
-- **RP2350 Pinout:** See `pico2_pinout.md` in project directory
-- **MicroPython Documentation:** https://docs.micropython.org/
+OLED driver: [micropython-ssd1306](https://github.com/mcauser/micropython-ssd1306) ·
+[MicroPython docs](https://docs.micropython.org/)
 
 ---
 
-## License
-
-This project is provided as-is for educational and personal use. Modify and distribute freely.
-
----
-
-## Support
-
-For issues or questions:
-1. Check the **Troubleshooting** section above
-2. Review `pico2_pinout.md` for pin reference
-3. Open an issue on the GitHub repository
+Provided as-is for educational and personal use. Modify and distribute freely.
